@@ -1,0 +1,6 @@
+{
+  "name": "Nếp - Việt Phục Remix",
+  "description": "Ứng dụng khám phá và phối đồ Việt phục truyền thống kết hợp thời trang hiện đại",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
