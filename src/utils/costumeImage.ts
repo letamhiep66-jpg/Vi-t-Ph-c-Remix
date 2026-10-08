@@ -2,8 +2,11 @@ export const COSTUME_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'] as co
 
 const COSTUME_FALLBACK_CANDIDATES: Record<string, string[]> = {
   'ao-giao-linh': [
-    '/images/costumes/ao-giao-linh.png',
     '/images/costumes/01 áo giao lĩnh1.png',
+    '/images/costumes/01%20%C3%A1o%20giao%20l%C4%A9nh1.png',
+    '/images/costumes/ao-giao-linh.png',
+    '/images/costumes/01 áo giao lĩnh 1.png',
+    '/images/costumes/1.png',
     '/images/costumes/ao-giao-linh.jpg'
   ],
   'ao-vien-linh': [
@@ -67,10 +70,34 @@ export function getCostumeImageCandidates(src?: string): string[] {
 
   // Find matching costume key if available
   let matchedKey: string | undefined;
+  const lower = trimmed.toLowerCase();
   for (const key of Object.keys(COSTUME_FALLBACK_CANDIDATES)) {
-    if (trimmed.includes(key)) {
+    if (lower.includes(key)) {
       matchedKey = key;
       break;
+    }
+  }
+  if (!matchedKey) {
+    if (lower.includes('giao linh') || lower.includes('giao-linh') || lower.includes('01')) {
+      matchedKey = 'ao-giao-linh';
+    } else if (lower.includes('vien linh') || lower.includes('02')) {
+      matchedKey = 'ao-vien-linh';
+    } else if (lower.includes('doi kham') || lower.includes('03')) {
+      matchedKey = 'ao-doi-kham';
+    } else if (lower.includes('tu than') || lower.includes('04')) {
+      matchedKey = 'ao-tu-than';
+    } else if (lower.includes('ngu than') || lower.includes('05')) {
+      matchedKey = 'ao-ngu-than';
+    } else if (lower.includes('tac') || lower.includes('06')) {
+      matchedKey = 'ao-tac-ngu-than-tay-thung';
+    } else if (lower.includes('nhat binh') || lower.includes('07')) {
+      matchedKey = 'ao-nhat-binh';
+    } else if (lower.includes('yem') || lower.includes('08')) {
+      matchedKey = 'ao-yem';
+    } else if (lower.includes('ba ba') || lower.includes('09')) {
+      matchedKey = 'ao-ba-ba';
+    } else if (lower.includes('le mur') || lower.includes('lemur') || lower.includes('10')) {
+      matchedKey = 'ao-dai-lemur';
     }
   }
 
@@ -89,11 +116,27 @@ export function getCostumeImageCandidates(src?: string): string[] {
   // Append known fallbacks
   if (matchedKey && COSTUME_FALLBACK_CANDIDATES[matchedKey]) {
     COSTUME_FALLBACK_CANDIDATES[matchedKey].forEach((fb) => {
+      const encodedFb = fb.startsWith('data:') || fb.startsWith('http') ? fb : encodeURI(decodeURI(fb));
+      if (!results.includes(encodedFb)) {
+        results.push(encodedFb);
+      }
       if (!results.includes(fb)) {
         results.push(fb);
       }
     });
   }
 
-  return results;
+  // Ensure all candidates have properly encoded counterparts
+  const finalResults: string[] = [];
+  results.forEach(r => {
+    const encoded = r.startsWith('data:') || r.startsWith('http') ? r : encodeURI(decodeURI(r));
+    if (!finalResults.includes(encoded)) {
+      finalResults.push(encoded);
+    }
+    if (!finalResults.includes(r)) {
+      finalResults.push(r);
+    }
+  });
+
+  return finalResults;
 }

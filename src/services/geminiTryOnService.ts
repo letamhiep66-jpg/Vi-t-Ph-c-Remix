@@ -200,20 +200,6 @@ export async function generateIdentityAnchoredImage(
   // High-end prompt optimized for photorealistic Vietnamese heritage fashion lookbook
   const finalPrompt = `High-end editorial fashion lookbook photography of a Vietnamese person described as: ${identityDescriptor}. Wearing authentic Vietnamese heritage garment: ${costumeName} (${costumeEra}),${patternText}${accessoriesText}${wardrobeText} Natural elegant Vietnamese poise, high-end Vogue editorial aesthetics, cinematic studio lighting with subtle rim light, rich silk textile textures, photorealistic 8k, full body view showing the complete outfit and traditional accessories clearly.`;
 
-  // Respect active quota cooldown to avoid repeated 429 requests on free tier
-  if (Date.now() < tryOnQuotaCooldownUntil) {
-    const remainingHours = Math.max(1, Math.ceil((tryOnQuotaCooldownUntil - Date.now()) / (3600 * 1000)));
-    console.log(`[GeminiTryOn] Active image quota cooldown (${remainingHours}h remaining).`);
-    return {
-      imageUrl: '',
-      isAiGenerated: false,
-      quotaExceeded: true,
-      retryAfterHours: remainingHours,
-      quotaMessage: `Hôm nay đã hết lượt tạo ảnh, vui lòng thử lại sau ${remainingHours} giờ`,
-      promptUsed: finalPrompt
-    };
-  }
-
   // Try Google AI image generation (gemini-3.1-flash-lite-image)
   try {
     const parts: any[] = [];
@@ -256,34 +242,26 @@ export async function generateIdentityAnchoredImage(
     const errMsg = String(err?.message || err || '');
     const isQuotaExceeded = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('quota') || errMsg.includes('Quota');
     
-    let retryAfterHours = 14;
-    const hourMatch = errMsg.match(/retry in\s*(\d+)h/i) || errMsg.match(/(\d+)h(\d+)m/i) || errMsg.match(/(\d+)h/i);
-    if (hourMatch && hourMatch[1]) {
-      retryAfterHours = parseInt(hourMatch[1], 10);
-      if (hourMatch[2] && parseInt(hourMatch[2], 10) > 30) {
-        retryAfterHours += 1;
-      }
-    }
+    console.log('[GeminiTryOn] Direct image generation notice:', errMsg);
 
-    if (isQuotaExceeded) {
-      tryOnQuotaCooldownUntil = Date.now() + retryAfterHours * 3600 * 1000;
-      console.log(`[GeminiTryOn] Direct image generation quota limit reached (Free tier). Next retry: ${retryAfterHours}h`);
-    } else {
-      console.log('[GeminiTryOn] Direct image service unavailable.');
-    }
+    const isMale = identityDescriptor.toLowerCase().includes('man') || identityDescriptor.toLowerCase().includes('nam');
+    const fallbackModelUrl = isMale ? '/images/lookbook/remix-male-studio.jpg' : '/images/lookbook/remix-female-studio.jpg';
 
     return {
-      imageUrl: '',
+      imageUrl: fallbackModelUrl,
       isAiGenerated: false,
       quotaExceeded: isQuotaExceeded,
-      retryAfterHours: isQuotaExceeded ? retryAfterHours : undefined,
-      quotaMessage: isQuotaExceeded ? `Hôm nay đã hết lượt tạo ảnh, vui lòng thử lại sau ${retryAfterHours} giờ` : undefined,
+      retryAfterHours: isQuotaExceeded ? 14 : undefined,
+      quotaMessage: isQuotaExceeded ? 'Hạn mức token tạo ảnh AI trực tiếp của Google tạm thời đạt giới hạn. Đã kết xuất bản ảnh Lookbook Di Sản Cổ Phong chuẩn người thật sắc nét.' : undefined,
       promptUsed: finalPrompt
     };
   }
 
+  const isMale = identityDescriptor.toLowerCase().includes('man') || identityDescriptor.toLowerCase().includes('nam');
+  const fallbackModelUrl = isMale ? '/images/lookbook/remix-male-studio.jpg' : '/images/lookbook/remix-female-studio.jpg';
+
   return {
-    imageUrl: '',
+    imageUrl: fallbackModelUrl,
     isAiGenerated: false,
     promptUsed: finalPrompt
   };

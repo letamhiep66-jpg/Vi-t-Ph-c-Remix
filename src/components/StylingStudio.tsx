@@ -14,6 +14,7 @@ import {
 import { db, doc, safeFirestoreSet } from '../services/firebase';
 import { HERITAGE_PATTERNS } from './mix/UnifiedFittingFlow';
 import { VoiceInputButton } from './common/VoiceInputButton';
+import { CostumeImage } from './common/CostumeImage';
 import { composeEditorialFittingImage } from '../utils/fittingCanvasComposer';
 import { QuotaExceededNoticeModal } from './mix/QuotaExceededNoticeModal';
 import { getSavedGeminiApiKey } from '../utils/apiKeyStorage';
@@ -558,7 +559,7 @@ export const StylingStudio: React.FC<StylingStudioProps> = ({ onClose }) => {
           }`}
         >
           <SlidersHorizontal className="w-4 h-4" />
-          <span>Xưởng Phối Đồ & Tạo Ảnh Lookbook</span>
+          <span>Phối Sắc Di Sản & Thử Đồ Nghệ Thuật</span>
         </button>
         <button
           type="button"
@@ -575,7 +576,7 @@ export const StylingStudio: React.FC<StylingStudioProps> = ({ onClose }) => {
       </div>
 
       {/* =========================================================================
-          TAB 1: PHỐI ĐỒ TỰ DO & TẠO ẢNH LOOKBOOK (STUDIO COCKPIT)
+          TAB 1: PHỐI SẮC DI SẢN & THỬ ĐỒ NGHỆ THUẬT (STUDIO COCKPIT)
           ========================================================================= */}
       {studioTab === 'studio' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -583,53 +584,25 @@ export const StylingStudio: React.FC<StylingStudioProps> = ({ onClose }) => {
           {/* LEFT COLUMN: Controls & Configurations (5 Cols) */}
           <div className="lg:col-span-5 space-y-5">
 
-            {/* DUAL ENGINE SWITCHER (Studio Miễn Phí vs Nano Banana Pro) */}
-            <div className="bg-white rounded-3xl border border-[#E9DFD1] p-4 shadow-xs space-y-2.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#800E13] flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5" />
-                <span>Động Cơ Tạo Ảnh Lookbook</span>
-              </span>
+            {/* Tóm tắt thông tin phục sức di sản & vóc dáng */}
+            <div className="bg-white rounded-3xl border border-[#E9DFD1] p-4 shadow-xs flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#800E13]/10 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4 text-[#800E13]" />
+                </div>
+                <div>
+                  <h5 className="text-xs font-bold text-[#2C241D]">
+                    Khắc Họa Sắc Phục & Vóc Dáng Người Thật
+                  </h5>
+                  <p className="text-[10px] text-[#7B6858]">
+                    Hòa sắc tà áo {selectedCostume.name}, hoa văn và dáng vóc {gender === 'male' ? 'Nam' : 'Nữ'} ({height}cm • {weight}kg).
+                  </p>
+                </div>
+              </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEngineMode('studio-free')}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    engineMode === 'studio-free'
-                      ? 'border-[#800E13] bg-gradient-to-br from-[#FFF8F0] to-[#FAF3EA] ring-2 ring-[#800E13]/20 shadow-xs'
-                      : 'border-[#E9DFD1] bg-[#FAF8F5] hover:border-[#800E13]/40'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-[#2C241D]">Chân Dung Studio</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      Miễn phí 100%
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-[#6C584C] leading-tight">
-                    Ghép người thật sắc nét, chuẩn dáng 8K, không lo hết lượt
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setEngineMode('nano-banana-pro')}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    engineMode === 'nano-banana-pro'
-                      ? 'border-[#800E13] bg-gradient-to-br from-[#FFF8F0] to-[#FAF3EA] ring-2 ring-[#800E13]/20 shadow-xs'
-                      : 'border-[#E9DFD1] bg-[#FAF8F5] hover:border-[#800E13]/40'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-[#2C241D]">Nano Banana Pro</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900">
-                      AI Direct
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-[#6C584C] leading-tight">
-                    Google Gemini Image • Lượt dùng chung / API Key cá nhân
-                  </span>
-                </button>
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Không Lo Hết Lượt</span>
               </div>
             </div>
             
@@ -881,7 +854,7 @@ export const StylingStudio: React.FC<StylingStudioProps> = ({ onClose }) => {
                       }`}
                     >
                       <div className="aspect-3/4 rounded-xl overflow-hidden bg-stone-100 mb-1.5 relative">
-                        <img
+                        <CostumeImage
                           src={costume.frontImage}
                           alt={costume.name}
                           className="w-full h-full object-cover transition-transform group-hover:scale-105"
@@ -1115,7 +1088,7 @@ export const StylingStudio: React.FC<StylingStudioProps> = ({ onClose }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Cổ phục được chọn */}
                   <div className="relative aspect-3/4 rounded-2xl overflow-hidden bg-stone-900 border border-[#DFD4C4] shadow-xs">
-                    <img
+                    <CostumeImage
                       src={selectedCostume.frontImage}
                       alt={selectedCostume.name}
                       className="w-full h-full object-cover"

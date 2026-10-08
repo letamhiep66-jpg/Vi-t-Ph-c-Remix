@@ -28,7 +28,12 @@ export const CostumeImage: React.FC<CostumeImageProps> = ({
     setHasFailedAll(candidates.length === 0);
   }, [src]);
 
-  const currentSrc = candidates[candidateIndex] || '';
+  const rawSrc = candidates[candidateIndex] || '';
+  const currentSrc = rawSrc
+    ? (rawSrc.startsWith('data:') || rawSrc.startsWith('blob:') || rawSrc.startsWith('http')
+        ? rawSrc
+        : encodeURI(decodeURI(rawSrc)))
+    : '';
 
   const handleError = () => {
     if (candidateIndex + 1 < candidates.length) {

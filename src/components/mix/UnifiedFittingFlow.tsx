@@ -279,10 +279,24 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
     removeWardrobeItem 
   } = useApp();
 
-  // Mode: 'occasion' (AI gợi ý theo dịp) hoặc 'free' (Phối đồ tự do)
+  // Mode: 'occasion' (AI gợi ý theo dịp) hoặc 'free' (Phối Sắc Di Sản & Thử Đồ Nghệ Thuật)
   const [fittingMode, setFittingMode] = useState<'occasion' | 'free'>(
     preselectedCostume ? 'free' : 'occasion'
   );
+
+  // User anthropometrics state (Giới tính, Chiều cao, Cân nặng để AI biết vóc dáng)
+  const [gender, setGender] = useState<'female' | 'male'>(
+    (userProfile?.gender as 'female' | 'male') || 'female'
+  );
+  const [height, setHeight] = useState<number>(
+    userProfile?.height || (gender === 'male' ? 175 : 162)
+  );
+  const [weight, setWeight] = useState<number>(
+    userProfile?.weight || (gender === 'male' ? 68 : 50)
+  );
+
+  const bmi = Number((weight / Math.pow(height / 100, 2)).toFixed(1));
+  const bodyShapeLabel = bmi < 19 ? 'Mảnh mai, thanh thoát' : bmi <= 24.5 ? 'Cân đối, chuẩn mực' : bmi <= 28 ? 'Đầy đặn, phúc hậu' : 'Vạm vỡ, đĩnh đạc';
 
   // Filter cho phần chọn cổ phục tự do
   const [freeEraFilter, setFreeEraFilter] = useState<string>('all');
@@ -652,13 +666,7 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
       return;
     }
 
-    // Nếu người dùng chọn Động cơ Studio Người Thật miễn phí, chạy trực tiếp không qua API quota
-    if (engineMode === 'studio-free') {
-      await handleSwitchToStudioAndGenerate();
-      return;
-    }
-
-    const targetPhoto = userPhoto || SAMPLE_STUDIO_MODELS[0].url;
+    const targetPhoto = userPhoto || (gender === 'male' ? SAMPLE_STUDIO_MODELS[1].url : SAMPLE_STUDIO_MODELS[0].url);
     const chosenTradAccessories = OFFICIAL_TRADITIONAL_ACCESSORIES.filter(a => 
       selectedTradAccessoryIds.includes(a.id)
     );
@@ -687,7 +695,7 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
 
     setIsGeneratingImage(true);
     setFittingError(null);
-    setGeneratingMessage(`AI Gemini đang dệt may ${selectedCostume.name}${desc} lên vóc dáng của bạn...`);
+    setGeneratingMessage(`AI Nếp đang hòa sắc ${selectedCostume.name}${desc} lên vóc dáng ${gender === 'male' ? 'Nam' : 'Nữ'} (${height}cm • ${weight}kg)...`);
     setCurrentStep(4);
     setResultViewMode('editorial');
 
@@ -706,6 +714,10 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
           costumeName: selectedCostume.name,
           stylingPrompt: fullStylingPrompt,
           apiKey: savedApiKey,
+          gender,
+          height,
+          weight,
+          bodyShape: bodyShapeLabel,
           wardrobeItems: activeWardrobeItems.map(w => ({ 
             name: w.name, 
             category: w.category,
@@ -729,15 +741,10 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
 
       const data = await res.json();
 
-      // Xử lý thông báo khi hết lượt tạo ảnh trực tiếp theo đúng yêu cầu
+      // Ghi nhận trạng thái token (không tự động popup chặn đứng người dùng)
       if (data.quotaExceeded) {
         setQuotaRemainingHours(data.retryAfterHours || 14);
         setIsQuotaExceeded(true);
-        setIsQuotaModalOpen(true);
-        setIsGeneratingImage(false);
-        if (data.geminiOutput) {
-          setGeminiFittingOutput(data.geminiOutput);
-        }
       }
 
       if (data.success) {
@@ -747,20 +754,22 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
 
         let finalImageUrl = data.imageUrl;
         // Synthesize tailored editorial portrait canvas if native AI image model wasn't returned
-        if (!data.isAiGeneratedImage) {
-          setGeneratingMessage('Đang kết xuất bức ảnh chân dung người thật sắc nét 8K...');
+        if (!data.isAiGeneratedImage || data.quotaExceeded) {
+          setGeneratingMessage('Đang kết xuất bản ảnh Lookbook Di Sản Cổ Phong người thật sắc nét...');
           const composed = await composeEditorialFittingImage({
             userPhoto: userPhoto || targetPhoto,
             costumeImage: selectedCostume.frontImage,
             costumeId: selectedCostume.id,
             costumeName: selectedCostume.name,
             dynasty: selectedCostume.dynasty,
-            gender: (userProfile?.gender as any) || 'female',
-            height: userProfile?.height || 165,
-            weight: userProfile?.weight || 52,
+            gender,
+            height,
+            weight,
+            bodyShape: (bodyShapeLabel.includes('Mảnh mai') ? 'slim' : bodyShapeLabel.includes('Cân đối') ? 'balanced' : bodyShapeLabel.includes('Đầy đặn') ? 'curvy' : 'athletic') as any,
             skinTone: 'natural',
             heritageColors: chosenColors,
             accessories: chosenTradAccessories,
+            wardrobeItems: activeWardrobeItems,
             patterns: chosenPatterns,
             patternDescription: patternDescription.trim(),
             stylingPrompt: fullStylingPrompt
@@ -781,17 +790,19 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
         costumeId: selectedCostume.id,
         costumeName: selectedCostume.name,
         dynasty: selectedCostume.dynasty,
-        gender: (userProfile?.gender as any) || 'female',
-        height: userProfile?.height || 165,
-        weight: userProfile?.weight || 52,
+        gender,
+        height,
+        weight,
+        bodyShape: (bodyShapeLabel.includes('Mảnh mai') ? 'slim' : bodyShapeLabel.includes('Cân đối') ? 'balanced' : bodyShapeLabel.includes('Đầy đặn') ? 'curvy' : 'athletic') as any,
         skinTone: 'natural',
         heritageColors: chosenColors,
         accessories: chosenTradAccessories,
+        wardrobeItems: activeWardrobeItems,
         patterns: chosenPatterns,
         patternDescription: patternDescription.trim(),
         stylingPrompt: fullStylingPrompt
       });
-      setImageHistory([composed || targetPhoto]);
+      setImageHistory([composed || selectedCostume.frontImage]);
       setCurrentHistoryIndex(0);
       setFittingError(null);
       if (!geminiFittingOutput) {
@@ -1020,7 +1031,7 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
             }`}
           >
             <Wand2 className="w-3.5 h-3.5" />
-            <span>Phối Đồ Tự Do</span>
+            <span>Phối Sắc Di Sản & Thử Đồ Nghệ Thuật</span>
           </button>
         </div>
 
@@ -1385,32 +1396,145 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
                 </div>
 
                 {/* Chọn nhanh ảnh mẫu studio */}
-                <div className="pt-1.5 border-t border-stone-200/80 flex flex-wrap items-center gap-2">
+                <div className="pt-2 border-t border-stone-200/80 flex flex-wrap items-center gap-2">
                   <span className="text-[10px] font-bold text-[#8C7A6B] uppercase tracking-wider">
                     Hoặc chọn mẫu studio:
                   </span>
                   <div className="flex items-center gap-1.5">
-                    {SAMPLE_STUDIO_MODELS.map(m => (
-                      <button
-                        key={m.name}
-                        type="button"
-                        onClick={() => setUserPhoto(m.url)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] transition-all cursor-pointer ${
-                          userPhoto === m.url
-                            ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold shadow-2xs'
-                            : 'bg-white text-[#5C4D3C] border-[#E9DFD1] hover:border-[#800E13]'
-                        }`}
-                      >
-                        <img src={m.url} alt={m.name} className="w-4 h-4 rounded-full object-cover" />
-                        <span>{m.name}</span>
-                      </button>
-                    ))}
+                    {SAMPLE_STUDIO_MODELS.map(m => {
+                      const isModelMale = m.name.includes('Nam');
+                      return (
+                        <button
+                          key={m.name}
+                          type="button"
+                          onClick={() => {
+                            setUserPhoto(m.url);
+                            if (isModelMale) {
+                              setGender('male');
+                              setHeight(176);
+                              setWeight(68);
+                            } else {
+                              setGender('female');
+                              setHeight(165);
+                              setWeight(50);
+                            }
+                          }}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] transition-all cursor-pointer ${
+                            userPhoto === m.url
+                              ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold shadow-2xs'
+                              : 'bg-white text-[#5C4D3C] border-[#E9DFD1] hover:border-[#800E13]'
+                          }`}
+                        >
+                          <img src={m.url} alt={m.name} className="w-4 h-4 rounded-full object-cover" />
+                          <span>{m.name}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Vóc dáng tóm tắt */}
-                <div className="text-[11px] text-[#7B6858]">
-                  Vóc dáng: <strong>{effectiveStylingProfile.name}</strong> ({effectiveStylingProfile.height}cm • {effectiveStylingProfile.weight}kg)
+                {/* BẢNG CHỌN GIỚI TÍNH, CHIỀU CAO, CÂN NẶNG ĐỂ AI GEN ẢNH CHUẨN XÁC */}
+                <div className="pt-2.5 border-t border-stone-200/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#800E13]">
+                      Thông số nhân trắc học (Để AI biết giới tính & vóc dáng):
+                    </span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100/80 text-amber-900 border border-amber-200">
+                      {bodyShapeLabel} • BMI {bmi}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* Giới tính */}
+                    <div className="flex items-center bg-white p-1 rounded-xl border border-[#E9DFD1]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGender('female');
+                          if (height === 175 || height === 176) setHeight(165);
+                          if (weight === 68) setWeight(50);
+                        }}
+                        className={`flex-1 py-1 px-2 rounded-lg text-xs font-bold transition-all text-center cursor-pointer ${
+                          gender === 'female'
+                            ? 'bg-[#800E13] text-white shadow-2xs'
+                            : 'text-[#6C584C] hover:text-[#800E13]'
+                        }`}
+                      >
+                        👩 Nữ nhân
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGender('male');
+                          if (height === 165 || height === 162) setHeight(175);
+                          if (weight === 50) setWeight(68);
+                        }}
+                        className={`flex-1 py-1 px-2 rounded-lg text-xs font-bold transition-all text-center cursor-pointer ${
+                          gender === 'male'
+                            ? 'bg-[#800E13] text-white shadow-2xs'
+                            : 'text-[#6C584C] hover:text-[#800E13]'
+                        }`}
+                      >
+                        👨 Nam nhân
+                      </button>
+                    </div>
+
+                    {/* Chiều cao */}
+                    <div className="flex items-center justify-between bg-white px-2.5 py-1 rounded-xl border border-[#E9DFD1] text-xs">
+                      <span className="text-[#8C7A6B] font-medium text-[11px]">Cao:</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setHeight(prev => Math.max(140, prev - 1))}
+                          className="w-5 h-5 rounded-md bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          value={height}
+                          onChange={(e) => setHeight(Math.max(130, Math.min(210, Number(e.target.value) || 165)))}
+                          className="w-12 text-center font-bold text-[#2C241D] bg-stone-50 rounded py-0.5 border border-stone-200 focus:outline-hidden text-xs"
+                        />
+                        <span className="text-[10px] text-stone-500 font-medium">cm</span>
+                        <button
+                          type="button"
+                          onClick={() => setHeight(prev => Math.min(210, prev + 1))}
+                          className="w-5 h-5 rounded-md bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Cân nặng */}
+                    <div className="flex items-center justify-between bg-white px-2.5 py-1 rounded-xl border border-[#E9DFD1] text-xs">
+                      <span className="text-[#8C7A6B] font-medium text-[11px]">Nặng:</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setWeight(prev => Math.max(35, prev - 1))}
+                          className="w-5 h-5 rounded-md bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          value={weight}
+                          onChange={(e) => setWeight(Math.max(30, Math.min(150, Number(e.target.value) || 52)))}
+                          className="w-12 text-center font-bold text-[#2C241D] bg-stone-50 rounded py-0.5 border border-stone-200 focus:outline-hidden text-xs"
+                        />
+                        <span className="text-[10px] text-stone-500 font-medium">kg</span>
+                        <button
+                          type="button"
+                          onClick={() => setWeight(prev => Math.min(150, prev + 1))}
+                          className="w-5 h-5 rounded-md bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2505,70 +2629,25 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
               </div>
             )}
 
-            {/* Bộ chọn động cơ tạo ảnh */}
-            <div className="p-4 rounded-2xl bg-white border border-[#E9DFD1] shadow-2xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Wand2 className="w-4 h-4 text-[#800E13]" />
-                  <span className="text-xs font-bold text-[#2C241D]">Chọn Động Cơ Tạo Ảnh Lookbook:</span>
+            {/* Tóm tắt thông tin phục sức di sản & vóc dáng */}
+            <div className="p-4 rounded-2xl bg-white border border-[#E9DFD1] shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#800E13]/10 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5 text-[#800E13]" />
                 </div>
-                {engineMode === 'studio-free' ? (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                    ✓ Khuyên dùng • 100% Miễn phí
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
-                    Google Gemini Image
-                  </span>
-                )}
+                <div>
+                  <h5 className="text-xs font-bold text-[#2C241D]">
+                    Khắc Họa Sắc Phục & Vóc Dáng Người Thật
+                  </h5>
+                  <p className="text-[11px] text-[#7B6858]">
+                    Hòa sắc tà áo {selectedCostume?.name || 'Cổ Phục'}, kết hợp hoa văn, phụ kiện và vóc dáng {gender === 'male' ? 'Nam' : 'Nữ'} ({height}cm • {weight}kg).
+                  </p>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setEngineMode('studio-free')}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    engineMode === 'studio-free'
-                      ? 'border-[#800E13] bg-gradient-to-br from-[#FFF8F0] to-[#FAF3EA] ring-2 ring-[#800E13]/20 shadow-xs'
-                      : 'border-[#E9DFD1] bg-[#FAF8F5] hover:border-[#800E13]/40'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-[#2C241D] flex items-center gap-1.5">
-                      <Camera className="w-3.5 h-3.5 text-[#800E13]" />
-                      <span>Studio Chân Dung Người Thật</span>
-                    </span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      Miễn phí 100%
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-[#6C584C] leading-relaxed">
-                    Ghép người thật sắc nét, chuẩn vóc dáng & diện mạo Á Đông. <strong>Không lo hết quota.</strong>
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setEngineMode('nano-banana-pro')}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    engineMode === 'nano-banana-pro'
-                      ? 'border-[#800E13] bg-gradient-to-br from-[#FFF8F0] to-[#FAF3EA] ring-2 ring-[#800E13]/20 shadow-xs'
-                      : 'border-[#E9DFD1] bg-[#FAF8F5] hover:border-[#800E13]/40'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-[#2C241D] flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-[#E9C46A]" />
-                      <span>Nano Banana Pro</span>
-                    </span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900">
-                      AI Direct
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-[#6C584C] leading-relaxed">
-                    Mô hình Google Gemini Cloud • Hạn mức dùng chung theo ngày hoặc API Key cá nhân.
-                  </span>
-                </button>
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Lookbook Chân Thực 8K</span>
               </div>
             </div>
 
@@ -2579,16 +2658,10 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
               className="w-full flex items-center justify-center gap-3 py-4 sm:py-5 px-6 bg-gradient-to-r from-[#800E13] via-[#9B2226] to-[#800E13] hover:from-[#9B2226] hover:to-[#B22222] text-white font-bold text-base sm:text-lg rounded-2xl transition-all shadow-xl shadow-[#800E13]/30 cursor-pointer disabled:opacity-50 hover:scale-[1.005] active:scale-[0.995]"
             >
               <Sparkles className="w-5 h-5 text-[#E9C46A] animate-pulse" />
-              <span>
-                {engineMode === 'studio-free'
-                  ? '✨ Bắt Đầu Thử Đồ Bằng Studio Người Thật (Miễn Phí)'
-                  : '✨ Bắt Đầu Thử Đồ Bằng Nano Banana Pro (Gemini AI)'}
-              </span>
+              <span>✨ Bắt Đầu Thử Phục Sắc Di Sản</span>
             </button>
             <p className="text-xs text-center text-[#7B6858]">
-              {engineMode === 'studio-free'
-                ? 'Studio sẽ hòa trộn chân dung người thật, tà áo cổ phục, vóc dáng và phụ kiện sắc nét 8K'
-                : 'Gemini sẽ hòa trộn hình ảnh của bạn, tà áo cổ phục, gam màu và các phụ kiện đã chọn lên người'}
+              Hệ thống sẽ hòa sắc tà áo cổ phục, phụ kiện, chất liệu gấm lụa và vóc dáng của bạn thành tác phẩm Lookbook di sản chân thực.
             </p>
           </div>
         </div>
