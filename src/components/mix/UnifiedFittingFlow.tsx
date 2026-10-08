@@ -3183,8 +3183,10 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
+    </div>
+  )}
 
       {/* =====================================================================
           BƯỚC 5: CHẤM ĐIỂM & XUẤT LOOKBOOK
@@ -3220,10 +3222,8 @@ export const UnifiedFittingFlow: React.FC<UnifiedFittingFlowProps> = ({
           <div className="bg-white rounded-3xl border border-[#E9DFD1] p-4 sm:p-6 shadow-xs">
             <OutfitCritiqueSection />
           </div>
-        </>
+        </div>
       )}
-    </div>
-  )}
 
       {/* Modal Quick Add Personal Item */}
       {isQuickAddOpen && (

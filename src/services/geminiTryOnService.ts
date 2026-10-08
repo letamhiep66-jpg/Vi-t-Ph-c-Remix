@@ -169,7 +169,7 @@ export async function generateIdentityAnchoredImage(
   patternDescription?: string,
   accessories?: Array<{ id?: string; name: string; category?: string; image?: string }> | string[],
   wardrobeItems?: Array<{ id?: string; name: string; category?: string; image?: string }> | string[]
-): Promise<{ imageUrl: string; isAiGenerated: boolean; promptUsed: string; quotaExceeded?: boolean; error?: string }> {
+): Promise<{ imageUrl: string; isAiGenerated: boolean; promptUsed: string; quotaExceeded?: boolean; retryAfterHours?: number; quotaMessage?: string; error?: string }> {
   // 1. Build Motif & Pattern Text
   let patternText = '';
   if (Array.isArray(patterns) && patterns.length > 0) {
